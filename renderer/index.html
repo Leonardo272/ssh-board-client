@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>SSH Board Client</title>
+  <link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header id="topbar">
+    <div id="brand">开发板SSH监控客户端</div>
+    <div id="connInfo"></div>
+    <button id="btnDisconnect" class="ghost" type="button">断开</button>
+  </header>
+
+  <main id="layout">
+    <aside id="filePanel">
+      <div class="panel-head">远程文件（SFTP）</div>
+      <div class="pathbar">
+        <button id="btnUp" type="button" title="上级目录">↑</button>
+        <input id="pathInput" spellcheck="false" placeholder="连接后显示">
+        <button id="btnGo" type="button" title="转到">→</button>
+        <button id="btnRefresh" type="button" title="刷新">⟳</button>
+      </div>
+      <div class="file-actions">
+        <button id="btnUpload" type="button">上传到当前目录</button>
+      </div>
+      <div id="fileList" class="scroll">
+        <div class="empty">连接成功后显示远程目录</div>
+      </div>
+      <div class="hint">双击目录进入，双击文件下载</div>
+    </aside>
+
+    <section id="termWrap">
+      <div id="terminal"></div>
+    </section>
+
+    <aside id="rightPanel">
+      <section class="panel" id="ipPanel">
+        <div class="panel-head">已连接IP <span id="ipTime" class="tag"></span></div>
+        <div id="ipList" class="scroll"><div class="empty">等待数据…</div></div>
+      </section>
+      <section class="panel" id="procPanel">
+        <div class="panel-head">运行中进程 Top16（CPU）</div>
+        <div id="procList" class="scroll"><div class="empty">等待数据…</div></div>
+      </section>
+      <section class="panel" id="memPanel">
+        <div class="panel-head">内存用量</div>
+        <div id="memBody"><div class="empty">等待数据…</div></div>
+      </section>
+    </aside>
+  </main>
+
+  <div id="toast"></div>
+
+  <div id="connectOverlay" class="overlay">
+    <form id="connectForm" autocomplete="off">
+      <h2>连接开发板</h2>
+      <label>已保存账户</label>
+      <div class="row">
+        <select id="savedSelect"><option value="">— 选择已保存账户 —</option></select>
+        <button type="button" id="btnDelete" class="ghost small">删除</button>
+      </div>
+      <label>IP地址</label>
+      <input id="host" placeholder="如 192.168.1.50" required>
+      <label>端口</label>
+      <input id="port" type="number" value="22" min="1" max="65535">
+      <label>用户名</label>
+      <input id="username" placeholder="如 root" required>
+      <label>密码</label>
+      <input id="password" type="password" placeholder="密码" required>
+      <label class="chk"><input type="checkbox" id="savePass"> 保存账号与密码到本机（密码加密存储）</label>
+      <button type="submit" id="btnLogin">登录</button>
+      <div id="connError"></div>
+    </form>
+  </div>
+
+  <div id="offlineOverlay" class="overlay hidden">
+    <div class="box">
+      <h2>连接已断开</h2>
+      <p id="offlineReason"></p>
+      <button id="btnReconnect" type="button">重新连接</button>
+    </div>
+  </div>
+
+  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

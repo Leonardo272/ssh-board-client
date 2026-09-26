@@ -1,0 +1,27 @@
+const { contextBridge, ipcRenderer } = require('electron');
+
+const ALLOWED_EVENTS = [
+  'shell:data', 'shell:closed',
+  'ssh:error', 'ssh:closed', 'ssh:client-info',
+  'sftp:ready', 'monitor:data'
+];
+
+contextBridge.exposeInMainWorld('bridge', {
+  connect: (cfg) => ipcRenderer.invoke('ssh:connect', cfg),
+  disconnect: () => ipcRenderer.invoke('ssh:disconnect'),
+  shellWrite: (data) => ipcRenderer.send('shell:write', data),
+  shellResize: (dims) => ipcRenderer.send('shell:resize', dims),
+  sftpPwd: () => ipcRenderer.invoke('sftp:pwd'),
+  sftpList: (p) => ipcRenderer.invoke('sftp:list', p),
+  sftpDownload: (p) => ipcRenderer.invoke('sftp:download', p),
+  sftpUpload: (dir) => ipcRenderer.invoke('sftp:upload', dir),
+  configList: () => ipcRenderer.invoke('config:list'),
+  configFill: (id) => ipcRenderer.invoke('config:fill', id),
+  configSave: (a) => ipcRenderer.invoke('config:save', a),
+  configDelete: (id) => ipcRenderer.invoke('config:delete', id),
+  on: (ch, cb) => {
+    if (ALLOWED_EVENTS.includes(ch)) {
+      ipcRenderer.on(ch, (_e, data) => cb(data));
+    }
+  }
+});
