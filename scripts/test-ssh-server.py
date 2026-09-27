@@ -120,6 +120,9 @@ class Server(paramiko.ServerInterface):
                     'fmsh            4701   0.1  0.0 1-02:03:04  sshd: fmsh@pts/1\n'
                     'root               1   0.0  0.0 10:00:00    /sbin/init\n'
                     'root            4364   0.0  0.0 00:00       [kworker/2:0-events]\n'
+                    'avahi            334   0.0  0.0 2-21:15:36  avahi-daemon: running [U.local]\n'
+                    'cups-browsed   10072   0.0  0.0 02:56:18   /usr/sbin/cups-browsed\n'
+                    'root          12000  85.0  1.0 1-00:00:00   python3 /root/bench_test.py\n'
                     'fmsh            4961 100.0  0.0 00:00       ps aux --sort=-%cpu\n'
                 )
                 chan.send(mock.encode('utf-8'))

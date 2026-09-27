@@ -294,15 +294,24 @@ function parseProcs(text) {
 const SYS_USERS = new Set(['root','daemon','avahi','avahi-autoipd','dbus','messagebus','message+','polkitd','polkitd+',
   'systemd','systemd-network','systemd-resolve','systemd-journald','systemd-timesync','systemd-udevd',
   'nobody','uuidd','chrony','ntp','sshd','udev','rpc','rpcuser','statd','fwupd','sync','mail','news',
-  'proxy','backup','list','gnats','irc','syslog','dnsmasq','tss','sssd','ntpsec','Debian-exim']);
+  'proxy','backup','list','gnats','irc','syslog','dnsmasq','tss','sssd','ntpsec','Debian-exim',
+  'cups','cups-browsed','lp','lpadmin','geoclue','rtkit','colord','pulse','gdm','lightdm',
+  'udisks','upower','saned','nmbd','smbd','rpcbind','at','atd','cron','crond','Debian-gdm']);
 
 const MONITOR_SELF = /ps aux --sort|ps -eo user|--sort=-%cpu|grep ESTABLISHED/;
+
+// root用户态系统进程（无路径前缀的守护进程）
+const ROOT_SYS_CMD = /^(systemd|\/sbin\/init|\(sd-pam\)|udev|systemd-[a-z]+d|dhclient|wpa_supplicant|agetty|login|cron|atd|dbus-daemon|rsyslogd|udevd|sshd: |avahi-daemon|cups-browsed|cupsd|nmbd|smbd|rpcbind)/;
 
 function isSystemProc(user, cmd) {
   if (cmd.startsWith('[')) return true; // 内核线程 kworker/rcu等
   if (MONITOR_SELF.test(cmd)) return true; // 监控命令自身，防误报
   if (/^sshd: /.test(cmd)) return false; // 会话进程单独归类
-  if (SYS_USERS.has(user) && /^(\/sbin|\/usr\/sbin|\/usr\/lib|\/lib|\/run)/.test(cmd)) return true;
+  if (user !== 'root' && SYS_USERS.has(user)) return true; // 非root系统账号一律视为系统进程
+  if (user === 'root') {
+    if (ROOT_SYS_CMD.test(cmd)) return true;
+    if (/^(\/sbin|\/usr\/sbin|\/usr\/lib|\/lib|\/run)/.test(cmd)) return true;
+  }
   return false;
 }
 

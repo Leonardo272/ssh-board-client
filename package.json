@@ -1,7 +1,7 @@
 {
   "name": "ssh-board-client",
   "productName": "SSH Board Client",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "开发板SSH连接与监控客户端",
   "main": "main.js",
   "author": "team",

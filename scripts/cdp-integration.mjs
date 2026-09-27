@@ -63,6 +63,7 @@ const finalState = await evalJs(`JSON.stringify({
   alert: document.querySelector('#procList .alert')?.textContent || '',
   alertRow: document.querySelector('#procList .alertrow')?.textContent || '',
   psSelfFiltered: ![...document.querySelectorAll('#procList .trow')].some(r => r.textContent.includes('--sort=-%cpu')),
+  falseAlarm: [...document.querySelectorAll('#procList .alertrow')].some(r => r.textContent.includes('avahi') || r.textContent.includes('cups')),
   mem: (document.getElementById('memBody') || {}).textContent?.slice(0, 60) || '',
   cpu: (document.getElementById('tab-cpu') || {}).textContent?.slice(0, 60) || '',
   npu: (document.getElementById('tab-npu') || {}).textContent?.slice(0, 80) || ''
