@@ -1,9 +1,13 @@
 # 依赖与构建产物（体积大且可重建）
 node_modules/
 dist/
+dist-build/
+dist-new/
 *.exe
 *.blockmap
 
 # 运行日志与本地测试数据
 *.log
 scripts/sftp-root/
+
+dist-new/

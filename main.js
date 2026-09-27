@@ -116,19 +116,22 @@ function execCommand(cmd, timeoutMs = EXEC_TIMEOUT_MS) {
 const CMDS = {
   ips: "(ss -tnp state established 2>/dev/null || (netstat -antp 2>/dev/null | grep ESTABLISHED)) | head -n 40",
   procs: "ps aux --sort=-%cpu | head -n 16",
-  mem: "free -b"
+  mem: "free -b",
+  // 会话与任务：who判断谁在线；ps带etime判断任务运行时长
+  sessions: "who; echo SPLIT; ps -eo user:16,pid,pcpu,pmem,etime:12,args --sort=-pcpu | head -n 20"
 };
 
 async function monitorTick() {
   if (!conn || monitorBusy) return;
   monitorBusy = true;
   try {
-    const [ips, procs, mem] = await Promise.all([
+    const [ips, procs, mem, sessions] = await Promise.all([
       execCommand(CMDS.ips),
       execCommand(CMDS.procs),
-      execCommand(CMDS.mem)
+      execCommand(CMDS.mem),
+      execCommand(CMDS.sessions)
     ]);
-    send('monitor:data', { ips: ips.out, procs: procs.out, mem: mem.out, ts: Date.now() });
+    send('monitor:data', { ips: ips.out, procs: procs.out, mem: mem.out, sessions: sessions.out, ts: Date.now() });
   } catch (e) {
     // 单次采集失败静默跳过，连接级错误由 error/close 事件处理
   } finally {

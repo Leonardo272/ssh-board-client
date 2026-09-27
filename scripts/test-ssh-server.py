@@ -108,6 +108,29 @@ class Server(paramiko.ServerInterface):
     def _exec(self, chan, command):
         try:
             cmd = command.decode('utf-8', 'ignore') if isinstance(command, bytes) else str(command)
+            # 模拟Linux侧输出，用于同事任务提醒功能的链路验证
+            if cmd.startswith('who;'):
+                mock = (
+                    'fmsh    pts/1        2026-09-27 09:00 (192.168.1.10)\n'
+                    'myuser  pts/2        2026-09-27 09:05 (192.168.1.99)\n'
+                    'SPLIT\n'
+                    'USER             PID  %CPU %MEM ELAPSED     ARGS\n'
+                    'fmsh            4960 200.0  1.2 05:32       python3 /home/fmsh/test_infer.py\n'
+                    'myuser          5100   2.0  0.5 00:10       -bash\n'
+                    'fmsh            4701   0.1  0.0 1-02:03:04  sshd: fmsh@pts/1\n'
+                    'root               1   0.0  0.0 10:00:00    /sbin/init\n'
+                    'root            4364   0.0  0.0 00:00       [kworker/2:0-events]\n'
+                    'fmsh            4961 100.0  0.0 00:00       ps aux --sort=-%cpu\n'
+                )
+                chan.send(mock.encode('utf-8'))
+                chan.send_exit_status(0)
+                chan.close()
+                return
+            if cmd.startswith('printf'):
+                chan.send(b'192.168.1.99 55555 22')
+                chan.send_exit_status(0)
+                chan.close()
+                return
             r = subprocess.run(cmd, shell=True, capture_output=True, timeout=6)
             if r.stdout:
                 chan.send(r.stdout)

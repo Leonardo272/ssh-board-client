@@ -88,6 +88,18 @@ input:focus, select:focus { outline: 1px solid #4a7bd0; }
 .me { color: #62c47a; }
 .procme { color: #62c47a; }
 
+/* 同事任务提醒 */
+.alert { margin: 6px; padding: 6px 10px; border-radius: 4px; font-size: 12px; }
+.alert.ok { background: #17301f; color: #62c47a; border: 1px solid #2a5a3a; }
+.alert.warn { background: #2f2a17; color: #e8c962; border: 1px solid #7a6a3f; }
+.alert.busy { background: #3a1f1f; color: #e89a8a; border: 1px solid #7a3f3f; }
+.alertrow { padding: 2px 10px; font-size: 11px; color: #e0b8b0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.alertrow .u { color: #e89a8a; font-weight: 600; }
+#procBadge { font-size: 12px; }
+#procBadge.ok { color: #62c47a; }
+#procBadge.warn { color: #e8c962; }
+#procBadge.busy { color: #e89a8a; }
+
 /* 内存面板 */
 #memBody { padding: 10px; }
 .memrow { margin-bottom: 10px; }

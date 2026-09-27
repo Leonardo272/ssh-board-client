@@ -22,6 +22,15 @@
   "build": {
     "appId": "com.team.sshboardclient",
     "productName": "SSH Board Client",
+    "directories": {
+      "output": "dist-build"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "!dist*/**"
+    ],
     "compression": "maximum",
     "npmRebuild": false,
     "electronDownload": {

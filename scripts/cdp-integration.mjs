@@ -59,6 +59,10 @@ for (let i = 0; i < 10; i++) {
 await sleep(12000); // 等一轮监控tick
 const finalState = await evalJs(`JSON.stringify({
   ipList: document.getElementById('ipList').textContent.slice(0, 80),
+  procBadge: document.getElementById('procBadge').textContent,
+  alert: document.querySelector('#procList .alert')?.textContent || '',
+  alertRow: document.querySelector('#procList .alertrow')?.textContent || '',
+  psSelfFiltered: ![...document.querySelectorAll('#procList .trow')].some(r => r.textContent.includes('--sort=-%cpu')),
   mem: (document.getElementById('memBody') || {}).textContent?.slice(0, 60) || '',
   cpu: (document.getElementById('tab-cpu') || {}).textContent?.slice(0, 60) || '',
   npu: (document.getElementById('tab-npu') || {}).textContent?.slice(0, 80) || ''

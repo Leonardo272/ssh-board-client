@@ -289,6 +289,78 @@ function parseProcs(text) {
   return rows;
 }
 
+/* ---------- 同事任务识别 ---------- */
+
+const SYS_USERS = new Set(['root','daemon','avahi','avahi-autoipd','dbus','messagebus','message+','polkitd','polkitd+',
+  'systemd','systemd-network','systemd-resolve','systemd-journald','systemd-timesync','systemd-udevd',
+  'nobody','uuidd','chrony','ntp','sshd','udev','rpc','rpcuser','statd','fwupd','sync','mail','news',
+  'proxy','backup','list','gnats','irc','syslog','dnsmasq','tss','sssd','ntpsec','Debian-exim']);
+
+const MONITOR_SELF = /ps aux --sort|ps -eo user|--sort=-%cpu|grep ESTABLISHED/;
+
+function isSystemProc(user, cmd) {
+  if (cmd.startsWith('[')) return true; // 内核线程 kworker/rcu等
+  if (MONITOR_SELF.test(cmd)) return true; // 监控命令自身，防误报
+  if (/^sshd: /.test(cmd)) return false; // 会话进程单独归类
+  if (SYS_USERS.has(user) && /^(\/sbin|\/usr\/sbin|\/usr\/lib|\/lib|\/run)/.test(cmd)) return true;
+  return false;
+}
+
+function isTaskProc(user, cmd) {
+  if (isSystemProc(user, cmd)) return false;
+  if (/^sshd: /.test(cmd)) return false;
+  if (/^-?(ba|z|da|a)?sh$/.test(cmd.trim())) return false; // 交互shell不算任务
+  return true;
+}
+
+function parseSessions(text) {
+  return String(text || '').split('\n').map(l => l.trim()).filter(l => l && l !== 'SPLIT').map(l => {
+    const m = l.match(/^(\S+)\s+(\S+)\s+(.+?)\s+\(([^)]+)\)$/);
+    if (m) return { user: m[1], tty: m[2], time: m[3], ip: m[4] };
+    const m2 = l.match(/^(\S+)\s+(\S+)\s+(.+)$/);
+    return m2 ? { user: m2[1], tty: m2[2], time: m2[3], ip: '' } : null;
+  }).filter(Boolean);
+}
+
+function parseTasks(text) {
+  const out = [];
+  const lines = String(text || '').split('\n');
+  for (let i = 1; i < lines.length; i++) { // 跳过表头
+    const m = lines[i].trim().match(/^(\S+)\s+(\d+)\s+([\d.]+)\s+([\d.]+)\s+(\S+)\s+(.+)$/);
+    if (m) out.push({ user: m[1], pid: m[2], cpu: m[3], mem: m[4], etime: m[5], cmd: m[6].trim() });
+  }
+  return out;
+}
+
+function renderColleagueAlert(sessionsText, tasksText) {
+  const myUser = $('username').value.trim();
+  const sessions = parseSessions(sessionsText);
+  const tasks = parseTasks(tasksText).filter(t => isTaskProc(t.user, t.cmd));
+  // 同事在线 = 其他IP的SSH会话，或其他账号的登录
+  const others = sessions.filter(s => (s.ip && s.ip !== myClientIp) || (!s.ip && s.user !== myUser) || (s.ip === myClientIp && s.user !== myUser));
+  // 同事任务 = 非我账号的活跃任务进程
+  const otherTasks = tasks.filter(t => t.user !== myUser);
+
+  let cls = 'ok', badge = '● 空闲', html = '';
+  if (otherTasks.length) {
+    cls = 'busy'; badge = '● 同事任务运行中';
+    html = `<div class="alert busy">⚠️ ${otherTasks.length} 个其他用户任务在运行：</div>` +
+      otherTasks.slice(0, 6).map(t =>
+        `<div class="alertrow" title="${esc(t.cmd)}"><span class="u">${esc(t.user)}</span> PID ${esc(t.pid)} | CPU ${esc(t.cpu)}% | 已运行 ${esc(t.etime)} | ${esc(t.cmd.length > 46 ? t.cmd.slice(0, 46) + '…' : t.cmd)}</div>`
+      ).join('');
+    if (otherTasks.length > 6) html += `<div class="alertrow">…等共 ${otherTasks.length} 个</div>`;
+  } else if (others.length) {
+    cls = 'warn'; badge = '● 同事在线';
+    const uniq = [...new Set(others.map(s => `${s.user}${s.ip ? '(' + s.ip + ')' : '(本地)'}`))];
+    html = `<div class="alert warn">🟡 ${uniq.length} 个其他用户在线（未见任务）：${esc(uniq.join('、'))}</div>`;
+  } else {
+    html = `<div class="alert ok">✅ 无其他用户任务，板子空闲</div>`;
+  }
+  $('procBadge').textContent = badge;
+  $('procBadge').className = 'tag ' + cls;
+  return html;
+}
+
 function parseMem(text) {
   const out = {};
   for (const line of String(text || '').split('\n')) {
@@ -326,9 +398,12 @@ function renderMonitor(d) {
   $('ipTime').textContent = `${String(t.getHours()).padStart(2, '0')}:${String(t.getMinutes()).padStart(2, '0')}:${String(t.getSeconds()).padStart(2, '0')}`;
 
   // 进程
-  const procs = parseProcs(d.procs);
+  const sesParts = String(d.sessions || '').split('SPLIT');
+  const alertHtml = renderColleagueAlert(sesParts[0] || '', sesParts[1] || '');
+  const procs = parseProcs(d.procs).filter(p => !MONITOR_SELF.test(p.cmd)); // 过滤监控命令自身
   const myRow = (u) => (u === $('username').value.trim() ? ' class="ellipsis procme"' : ' class="ellipsis"');
   $('procList').innerHTML = [
+    alertHtml,
     '<div class="trow head"><span>用户</span><span>PID</span><span style="text-align:right">CPU%</span><span style="text-align:right">MEM%</span><span>命令</span></div>',
     ...procs.map(x =>
       `<div class="trow" title="${esc(x.cmd)}">` +
