@@ -270,6 +270,8 @@ function parseIpLines(text) {
       if (n) proc = n[1];
     }
     const peerIp = peer.replace(/^\[|\]?:\d+$/g, '');
+    // 过滤板内回环自连（127.x / ::1），只显示外部连接，避免干扰"查同事"
+    if (peerIp.startsWith('127.') || peerIp === '::1') continue;
     rows.push({ local, peer, proc, mine: peerIp === myClientIp });
   }
   return rows;

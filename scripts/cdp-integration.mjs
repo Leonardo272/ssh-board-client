@@ -1,6 +1,10 @@
 // 本地SSH服务器集成测试：连接→SFTP→监控面板→断线
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-const pages = await (await fetch('http://127.0.0.1:9222/json')).json();
+let pages;
+for (let i = 0; i < 10; i++) {
+  try { pages = await (await fetch('http://127.0.0.1:9222/json')).json(); break; }
+  catch (e) { if (i === 9) throw e; await sleep(2000); }
+}
 const page = pages.find(p => p.type === 'page' && p.url.includes('index.html'));
 if (!page) { console.log('NO_PAGE'); process.exit(1); }
 const ws = new WebSocket(page.webSocketDebuggerUrl);
