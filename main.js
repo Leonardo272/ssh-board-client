@@ -118,7 +118,7 @@ const CMDS = {
   procs: "ps aux --sort=-%cpu | head -n 16",
   mem: "free -b",
   // 会话与任务：who判断谁在线；ps带etime判断任务运行时长
-  sessions: "who; echo SPLIT; ps -eo user:16,pid,pcpu,pmem,etime:12,args --sort=-pcpu | head -n 20"
+  sessions: "who; echo SPLIT; ps -eo user:16,pid,pcpu,pmem,etime:12,args --sort=-pcpu | head -n 40"
 };
 
 async function monitorTick() {

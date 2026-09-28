@@ -134,6 +134,15 @@ class Server(paramiko.ServerInterface):
                 chan.send_exit_status(0)
                 chan.close()
                 return
+            if 'ss -tnp' in cmd:
+                mock = (
+                    'Estab 0 0 192.168.1.50:9981 192.168.1.88:40001 users:(("icraft-serve",pid=888,fd=8))\n'
+                    'Estab 0 0 192.168.1.50:22 192.168.1.99:55555 users:(("sshd",pid=4617,fd=3))\n'
+                )
+                chan.send(mock.encode('utf-8'))
+                chan.send_exit_status(0)
+                chan.close()
+                return
             r = subprocess.run(cmd, shell=True, capture_output=True, timeout=6)
             if r.stdout:
                 chan.send(r.stdout)

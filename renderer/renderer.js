@@ -343,7 +343,7 @@ function parseTasks(text) {
   return out;
 }
 
-function renderColleagueAlert(sessionsText, tasksText) {
+function renderColleagueAlert(sessionsText, tasksText, ipRows) {
   const myUser = $('username').value.trim();
   const sessions = parseSessions(sessionsText);
   const tasks = parseTasks(tasksText).filter(t => isTaskProc(t.user, t.cmd));
@@ -351,15 +351,20 @@ function renderColleagueAlert(sessionsText, tasksText) {
   const others = sessions.filter(s => (s.ip && s.ip !== myClientIp) || (!s.ip && s.user !== myUser) || (s.ip === myClientIp && s.user !== myUser));
   // 同事任务 = 非我账号的活跃任务进程
   const otherTasks = tasks.filter(t => t.user !== myUser);
+  // 外部服务连接：非SSH(22)端口被外部IP使用（如icraft-server:9981），说明同事在用板子
+  const svcConns = (ipRows || []).filter(r => !r.local.endsWith(':22') && !r.mine);
+  const uniqSvc = [...new Set(svcConns.map(s =>
+    `${s.proc || '未知服务'}(:${s.local.split(':').pop()}) ← ${s.peer.split(':')[0]}`))];
 
   let cls = 'ok', badge = '● 空闲', html = '';
-  if (otherTasks.length) {
-    cls = 'busy'; badge = '● 同事任务运行中';
-    html = `<div class="alert busy">⚠️ ${otherTasks.length} 个其他用户任务在运行：</div>` +
+  if (otherTasks.length || uniqSvc.length) {
+    cls = 'busy'; badge = '● 同事使用中';
+    html = `<div class="alert busy">⚠️ 检测到其他用户活动（任务${otherTasks.length}个/服务连接${uniqSvc.length}个）：</div>` +
       otherTasks.slice(0, 6).map(t =>
         `<div class="alertrow" title="${esc(t.cmd)}"><span class="u">${esc(t.user)}</span> PID ${esc(t.pid)} | CPU ${esc(t.cpu)}% | 已运行 ${esc(t.etime)} | ${esc(t.cmd.length > 46 ? t.cmd.slice(0, 46) + '…' : t.cmd)}</div>`
       ).join('');
-    if (otherTasks.length > 6) html += `<div class="alertrow">…等共 ${otherTasks.length} 个</div>`;
+    if (otherTasks.length > 6) html += `<div class="alertrow">…等共 ${otherTasks.length} 个任务</div>`;
+    html += uniqSvc.slice(0, 4).map(s => `<div class="alertrow"><span class="u">服务</span> ${esc(s)}</div>`).join('');
   } else if (others.length) {
     cls = 'warn'; badge = '● 同事在线';
     const uniq = [...new Set(others.map(s => `${s.user}${s.ip ? '(' + s.ip + ')' : '(本地)'}`))];
@@ -410,7 +415,7 @@ function renderMonitor(d) {
 
   // 进程
   const sesParts = String(d.sessions || '').split('SPLIT');
-  const alertHtml = renderColleagueAlert(sesParts[0] || '', sesParts[1] || '');
+  const alertHtml = renderColleagueAlert(sesParts[0] || '', sesParts[1] || '', ips);
   const procs = parseProcs(d.procs).filter(p => !MONITOR_SELF.test(p.cmd)); // 过滤监控命令自身
   const myRow = (u) => (u === $('username').value.trim() ? ' class="ellipsis procme"' : ' class="ellipsis"');
   $('procList').innerHTML = [

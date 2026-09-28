@@ -66,6 +66,7 @@ const finalState = await evalJs(`JSON.stringify({
   procBadge: document.getElementById('procBadge').textContent,
   alert: document.querySelector('#procList .alert')?.textContent || '',
   alertRow: document.querySelector('#procList .alertrow')?.textContent || '',
+  svcRow: [...document.querySelectorAll('#procList .alertrow')].map(r => r.textContent).find(t => t.includes('9981')) || '',
   psSelfFiltered: ![...document.querySelectorAll('#procList .trow')].some(r => r.textContent.includes('--sort=-%cpu')),
   falseAlarm: [...document.querySelectorAll('#procList .alertrow')].some(r => r.textContent.includes('avahi') || r.textContent.includes('cups')),
   mem: (document.getElementById('memBody') || {}).textContent?.slice(0, 60) || '',
