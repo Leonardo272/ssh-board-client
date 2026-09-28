@@ -300,7 +300,8 @@ const SYS_USERS = new Set(['root','daemon','avahi','avahi-autoipd','dbus','messa
   'cups','cups-browsed','lp','lpadmin','geoclue','rtkit','colord','pulse','gdm','lightdm',
   'udisks','upower','saned','nmbd','smbd','rpcbind','at','atd','cron','crond','Debian-gdm']);
 
-const MONITOR_SELF = /ps aux --sort|ps -eo user|--sort=-%cpu|grep ESTABLISHED/;
+// 监控自身进程过滤：含bash -c包装命令与已退出的僵尸进程（<defunct>不占CPU）
+const MONITOR_SELF = /ps aux --sort|ps -eo user|--sort=-%cpu|grep ESTABLISHED|<defunct>|bash -c (grep '\^cpu|busybox devmem|ss -tnp|who; echo SPLIT|free -b)/;
 
 // root用户态系统进程（无路径前缀的守护进程）
 const ROOT_SYS_CMD = /^(systemd|\/sbin\/init|\(sd-pam\)|udev|systemd-[a-z]+d|dhclient|wpa_supplicant|agetty|login|cron|atd|dbus-daemon|rsyslogd|udevd|sshd: |avahi-daemon|cups-browsed|cupsd|nmbd|smbd|rpcbind)/;

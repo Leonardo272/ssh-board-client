@@ -124,6 +124,9 @@ class Server(paramiko.ServerInterface):
                     'cups-browsed   10072   0.0  0.0 02:56:18   /usr/sbin/cups-browsed\n'
                     'root          12000  85.0  1.0 1-00:00:00   python3 /root/bench_test.py\n'
                     'fmsh            4961 100.0  0.0 00:00       ps aux --sort=-%cpu\n'
+                    'root          13796 200.0  0.0 00:00       [ss] <defunct>\n'
+                    'root          13786  50.0  0.0 00:00       bash -c grep ^cpu /proc/stat; echo SPLIT\n'
+                    'root          13789  50.0  0.0 00:00       bash -c busybox devmem 0xE6002024 32\n'
                 )
                 chan.send(mock.encode('utf-8'))
                 chan.send_exit_status(0)

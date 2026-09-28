@@ -330,6 +330,11 @@ ipcMain.handle('config:delete', async (_e, id) => {
 
 /* ---------- 应用生命周期 ---------- */
 
+// 测试模式：独立userData目录，避免与用户正在运行的实例发生单实例锁冲突
+if (process.env.SBC_TEST_USER_DATA) {
+  try { app.setPath('userData', process.env.SBC_TEST_USER_DATA); } catch (e) {}
+}
+
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
