@@ -4,6 +4,7 @@ const fs = require('fs');
 const { Client } = require('ssh2');
 
 const MONITOR_INTERVAL_MS = 10000; // 监控刷新间隔
+const FAST_INTERVAL_MS = 2000;     // CPU高频采样（/proc/stat差值）
 const EXEC_TIMEOUT_MS = 8000;      // 单条监控命令超时
 const KEEPALIVE_MS = 15000;        // SSH心跳间隔
 const MAX_OUTPUT = 200 * 1024;     // 单命令输出上限200KB
@@ -14,6 +15,8 @@ let shellStream = null;
 let sftp = null;
 let monitorTimer = null;
 let monitorBusy = false;
+let fastTimer = null;
+let fastBusy = false;
 let lastLogin = null; // 保存最近一次登录参数供重连
 
 /* ---------- 配置存储（密码DPAPI加密） ---------- */
@@ -139,15 +142,32 @@ async function monitorTick() {
   }
 }
 
+async function fastTick() {
+  if (!conn || fastBusy) return;
+  fastBusy = true;
+  try {
+    const r = await execCommand(CMDS.cpu, 5000);
+    send('monitor:fast', { cpu: r.out, ts: Date.now() });
+  } catch (e) {
+    // 静默跳过，主轮询兜底
+  } finally {
+    fastBusy = false;
+  }
+}
+
 function startMonitor() {
   stopMonitor();
+  fastTick();
+  fastTimer = setInterval(fastTick, FAST_INTERVAL_MS);
   monitorTick();
   monitorTimer = setInterval(monitorTick, MONITOR_INTERVAL_MS);
 }
 
 function stopMonitor() {
   if (monitorTimer) { clearInterval(monitorTimer); monitorTimer = null; }
+  if (fastTimer) { clearInterval(fastTimer); fastTimer = null; }
   monitorBusy = false;
+  fastBusy = false;
 }
 
 /* ---------- 连接生命周期 ---------- */
@@ -295,6 +315,11 @@ ipcMain.handle('sftp:upload', async (_e, remoteDir) => {
 });
 
 ipcMain.handle('config:list', async () => accountList(loadConfig()));
+
+/* ---------- 剪贴板（主进程API，不受浏览器权限限制） ---------- */
+
+ipcMain.handle('clip:read', () => require('electron').clipboard.readText());
+ipcMain.on('clip:write', (_e, text) => { try { require('electron').clipboard.writeText(String(text || '')); } catch (e) {} });
 
 ipcMain.handle('config:fill', async (_e, id) => {
   const a = (loadConfig().accounts || []).find(x => x.id === id);

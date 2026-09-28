@@ -3,7 +3,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 const ALLOWED_EVENTS = [
   'shell:data', 'shell:closed',
   'ssh:error', 'ssh:closed', 'ssh:client-info',
-  'sftp:ready', 'monitor:data'
+  'sftp:ready', 'monitor:data', 'monitor:fast'
 ];
 
 contextBridge.exposeInMainWorld('bridge', {
@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld('bridge', {
   configFill: (id) => ipcRenderer.invoke('config:fill', id),
   configSave: (a) => ipcRenderer.invoke('config:save', a),
   configDelete: (id) => ipcRenderer.invoke('config:delete', id),
+  clipRead: () => ipcRenderer.invoke('clip:read'),
+  clipWrite: (t) => ipcRenderer.send('clip:write', t),
   on: (ch, cb) => {
     if (ALLOWED_EVENTS.includes(ch)) {
       ipcRenderer.on(ch, (_e, data) => cb(data));

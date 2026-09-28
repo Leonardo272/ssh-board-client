@@ -80,6 +80,26 @@ function initTerminal() {
   };
   window.addEventListener('resize', onResize);
   new ResizeObserver(onResize).observe($('termWrap'));
+
+  // 粘贴支持：右键粘贴 / Ctrl+V / Ctrl+Shift+V；选中文字自动复制（MobaXterm习惯）
+  const pasteToRemote = async () => {
+    try {
+      const text = await api.clipRead();
+      if (text) api.shellWrite(new TextEncoder().encode(text));
+    } catch (e) {}
+  };
+  $('termWrap').addEventListener('contextmenu', (e) => { e.preventDefault(); pasteToRemote(); });
+  term.attachCustomKeyEventHandler((ev) => {
+    if (ev.type === 'keydown' && (ev.key === 'v' || ev.key === 'V') && (ev.ctrlKey || ev.metaKey)) {
+      pasteToRemote();
+      return false;
+    }
+    return true;
+  });
+  term.onSelectionChange(() => {
+    const sel = term.getSelection();
+    if (sel) { try { api.clipWrite(sel); } catch (e) {} }
+  });
 }
 
 /* ---------- 账户管理 ---------- */
@@ -196,6 +216,7 @@ api.on('sftp:ready', async () => {
   } catch (e) { toast('SFTP初始化失败: ' + e.message, true); }
 });
 api.on('monitor:data', renderMonitor);
+api.on('monitor:fast', (d) => renderCpu(d.cpu)); // CPU利用率2s刷新
 
 /* ---------- 文件面板 ---------- */
 
