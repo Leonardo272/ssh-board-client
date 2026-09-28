@@ -355,6 +355,10 @@ function renderColleagueAlert(sessionsText, tasksText, ipRows) {
   const svcConns = (ipRows || []).filter(r => !r.local.endsWith(':22') && !r.mine);
   const uniqSvc = [...new Set(svcConns.map(s =>
     `${s.proc || '未知服务'}(:${s.local.split(':').pop()}) ← ${s.peer.split(':')[0]}`))];
+  // 外部SSH连接（含scp/自动化脚本等无pts会话的连接，who里看不到）
+  const sshPeers = [...new Set((ipRows || [])
+    .filter(r => r.local.endsWith(':22') && !r.mine)
+    .map(r => `${r.peer.split(':')[0]}${r.proc ? ' [' + r.proc + ']' : ''}`))];
 
   let cls = 'ok', badge = '● 空闲', html = '';
   if (otherTasks.length || uniqSvc.length) {
@@ -365,10 +369,11 @@ function renderColleagueAlert(sessionsText, tasksText, ipRows) {
       ).join('');
     if (otherTasks.length > 6) html += `<div class="alertrow">…等共 ${otherTasks.length} 个任务</div>`;
     html += uniqSvc.slice(0, 4).map(s => `<div class="alertrow"><span class="u">服务</span> ${esc(s)}</div>`).join('');
-  } else if (others.length) {
+  } else if (others.length || sshPeers.length) {
     cls = 'warn'; badge = '● 同事在线';
     const uniq = [...new Set(others.map(s => `${s.user}${s.ip ? '(' + s.ip + ')' : '(本地)'}`))];
-    html = `<div class="alert warn">🟡 ${uniq.length} 个其他用户在线（未见任务）：${esc(uniq.join('、'))}</div>`;
+    const srcs = [...uniq, ...sshPeers.filter(p => !uniq.some(u => p.startsWith(u.split('(')[0])))];
+    html = `<div class="alert warn">🟡 检测到其他用户连接（未见任务）：${esc(srcs.join('、'))}</div>`;
   } else {
     html = `<div class="alert ok">✅ 无其他用户任务，板子空闲</div>`;
   }

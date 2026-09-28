@@ -138,6 +138,7 @@ class Server(paramiko.ServerInterface):
                 mock = (
                     'Estab 0 0 192.168.1.50:9981 192.168.1.88:40001 users:(("icraft-serve",pid=888,fd=8))\n'
                     'Estab 0 0 192.168.1.50:22 192.168.1.99:55555 users:(("sshd",pid=4617,fd=3))\n'
+                    'Estab 0 0 192.168.1.50:22 192.168.1.77:41234 users:(("sshd",pid=999,fd=3))\n'
                 )
                 chan.send(mock.encode('utf-8'))
                 chan.send_exit_status(0)
