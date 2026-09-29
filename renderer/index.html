@@ -24,7 +24,17 @@
         <button id="btnRefresh" type="button" title="刷新">⟳</button>
       </div>
       <div class="file-actions">
-        <button id="btnUpload" type="button">上传到当前目录</button>
+        <button id="btnMkdir" type="button" title="新建文件夹">📁+</button>
+        <button id="btnTouch" type="button" title="新建空文件">📄+</button>
+        <button id="btnDelete" type="button" title="删除选中（目录递归）">🗑</button>
+        <button id="btnCopyAbs" type="button" title="复制选中项绝对路径（未选中复制当前目录）">⧉绝对</button>
+        <button id="btnCopyRel" type="button" title="复制选中项相对家目录路径">⧉相对</button>
+        <button id="btnUpload" type="button" title="上传文件到当前目录">上传</button>
+      </div>
+      <div id="nameRow" class="name-row hidden">
+        <input id="nameInput" placeholder="输入名称" spellcheck="false">
+        <button id="nameOk" type="button">确定</button>
+        <button id="nameCancel" type="button">取消</button>
       </div>
       <div id="fileList" class="scroll">
         <div class="empty">连接成功后显示远程目录</div>

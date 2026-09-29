@@ -6,6 +6,7 @@ import sys
 import threading
 
 import paramiko
+from paramiko.sftp import SFTP_OK
 
 HOST, PORT = '127.0.0.1', 2222
 USER, PWD = 'test', 'test123'
@@ -43,16 +44,33 @@ class SFTPHandle(paramiko.SFTPServerInterface):
     def open(self, path, flags, attr):
         p = self._real(path)
         os.makedirs(os.path.dirname(p), exist_ok=True)
-        return paramiko.SFTPHandle(os.open(p, flags))
+        mode = getattr(attr, 'st_mode', None) or 0o666
+        fd = os.open(p, flags, mode)
+        os.close(fd)
+        h = paramiko.SFTPHandle(flags)
+        if flags & os.O_WRONLY or flags & os.O_RDWR:
+            h.writefile = open(p, 'ab' if (flags & os.O_APPEND) else 'wb', buffering=0)
+        if not (flags & os.O_WRONLY):
+            h.readfile = open(p, 'rb', buffering=0)
+        return h
 
     def remove(self, path):
-        os.remove(self._real(path))
+        try:
+            os.remove(self._real(path)); return SFTP_OK
+        except Exception as e:
+            print('remove ERR', path, repr(e), flush=True); raise
 
     def mkdir(self, path, attr):
-        os.mkdir(self._real(path))
+        try:
+            os.mkdir(self._real(path)); return SFTP_OK
+        except Exception as e:
+            print('mkdir ERR', path, repr(e), flush=True); raise
 
     def rmdir(self, path):
-        os.rmdir(self._real(path))
+        try:
+            os.rmdir(self._real(path)); return SFTP_OK
+        except Exception as e:
+            print('rmdir ERR', path, repr(e), flush=True); raise
 
     def chdir(self, path):
         self._real(path)
@@ -137,11 +155,48 @@ class Server(paramiko.ServerInterface):
                 chan.send_exit_status(0)
                 chan.close()
                 return
-            if 'ss -tnp' in cmd:
+            if cmd.startswith('(ss -tnp'):
                 mock = (
                     'Estab 0 0 192.168.1.50:9981 192.168.1.88:40001 users:(("icraft-serve",pid=888,fd=8))\n'
                     'Estab 0 0 192.168.1.50:22 192.168.1.99:55555 users:(("sshd",pid=4617,fd=3))\n'
                     'Estab 0 0 192.168.1.50:22 192.168.1.77:41234 users:(("sshd",pid=999,fd=3))\n'
+                )
+                chan.send(mock.encode('utf-8'))
+                chan.send_exit_status(0)
+                chan.close()
+                return
+            if cmd.startswith('echo <<<IPS>>>'):
+                # 合并监控命令mock：按分段标记返回
+                mock = (
+                    '<<<IPS>>>\n'
+                    'Estab 0 0 192.168.1.50:9981 192.168.1.88:40001 users:(("icraft-serve",pid=888,fd=8))\n'
+                    'Estab 0 0 192.168.1.50:22 192.168.1.99:55555 users:(("sshd",pid=4617,fd=3))\n'
+                    'Estab 0 0 192.168.1.50:22 192.168.1.77:41234 users:(("sshd",pid=999,fd=3))\n'
+                    '<<<PROCS>>>\n'
+                    'USER       PID %CPU %MEM COMMAND\n'
+                    'fmsh      4960 200.0  1.2 python3 /home/fmsh/test_infer.py\n'
+                    'root     13796 200.0  0.0 [ss] <defunct>\n'
+                    '<<<MEM>>>\n'
+                    '              total        used        free      shared  buff/cache   available\n'
+                    'Mem:    8589934592 2147483648 1073741824   134217728  4294967296  5368709120\n'
+                    'Swap:   2147483648           0 2147483648\n'
+                    '<<<SES>>>\n'
+                    'fmsh    pts/1        2026-09-27 09:00 (192.168.1.10)\n'
+                    'myuser  pts/2        2026-09-27 09:05 (192.168.1.99)\n'
+                    '<<<SESPS>>>\n'
+                    'USER             PID  %CPU %MEM ELAPSED     ARGS\n'
+                    'fmsh            4960 200.0  1.2 05:32       python3 /home/fmsh/test_infer.py\n'
+                    'myuser          5100   2.0  0.5 00:10       -bash\n'
+                    'fmsh            4701   0.1  0.0 1-02:03:04  sshd: fmsh@pts/1\n'
+                    'root               1   0.0  0.0 10:00:00    /sbin/init\n'
+                    'root            4364   0.0  0.0 00:00       [kworker/2:0-events]\n'
+                    'avahi            334   0.0  0.0 2-21:15:36  avahi-daemon: running [U.local]\n'
+                    'cups-browsed   10072   0.0  0.0 02:56:18   /usr/sbin/cups-browsed\n'
+                    'root          12000  85.0  1.0 1-00:00:00   python3 /root/bench_test.py\n'
+                    'fmsh            4961 100.0  0.0 00:00       ps aux --sort=-%cpu\n'
+                    'root          13786  50.0  0.0 00:00       bash -c grep ^cpu /proc/stat; echo SPLIT\n'
+                    'root          13789  50.0  0.0 00:00       bash -c busybox devmem 0xE6002024 32\n'
+                    '<<<END>>>\n'
                 )
                 chan.send(mock.encode('utf-8'))
                 chan.send_exit_status(0)

@@ -57,7 +57,12 @@ input:focus, select:focus { outline: 1px solid #4a7bd0; }
 .pathbar input { flex: 1; min-width: 0; font-size: 12px; }
 .pathbar button { flex: none; width: 30px; padding: 4px 0; }
 .file-actions { padding: 8px; border-bottom: 1px solid #262f47; }
-.file-actions button { width: 100%; }
+.file-actions { display: flex; flex-wrap: wrap; gap: 4px; }
+.file-actions button { padding: 4px 8px; font-size: 12px; flex: 1; white-space: nowrap; }
+.name-row { display: flex; gap: 4px; padding: 6px 8px; border-bottom: 1px solid #262f47; }
+.name-row.hidden { display: none; }
+.name-row input { flex: 1; min-width: 0; font-size: 12px; }
+.name-row button { padding: 4px 8px; font-size: 12px; }
 .frow {
   display: grid; grid-template-columns: minmax(120px, 1fr) 64px 84px; gap: 6px;
   padding: 4px 8px; cursor: default; font-size: 12px; border-bottom: 1px solid #1e2537;
@@ -69,6 +74,7 @@ input:focus, select:focus { outline: 1px solid #4a7bd0; }
 .frow .num { text-align: right; color: #8b97ad; }
 .frow .mode { color: #6d7a94; }
 .frow.dir .name { color: #7ea6e8; }
+.frow.selected { background: #2a3a5f !important; outline: 1px solid #4a7bd0; }
 
 /* 终端 */
 #termWrap { position: relative; min-width: 0; min-height: 0; background: #0f131c; }

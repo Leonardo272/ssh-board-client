@@ -75,6 +75,17 @@ const finalState = await evalJs(`JSON.stringify({
   npu: (document.getElementById('tab-npu') || {}).textContent?.slice(0, 80) || ''
 })`);
 console.log('监控面板:', finalState);
+const fileOps = await evalJs(`(async () => {
+  const b = window.bridge;
+  await b.sftpMkdir('/dir_test');
+  await b.sftpTouch('/dir_test/newfile.txt');
+  const inDir = await b.sftpList('/dir_test');
+  await b.sftpDelete('/dir_test');
+  let gone = false;
+  try { await b.sftpList('/dir_test'); } catch (e) { gone = true; }
+  return JSON.stringify({ mkdirTouchListed: inDir.map(x => x.name), deletedOK: gone });
+})()`);
+console.log('文件操作:', fileOps);
 console.log('JS异常:', exceptions.length ? exceptions.join(' || ') : '无');
 console.log(ok ? 'INTEGRATION_OK' : 'INTEGRATION_FAIL');
 ws.close();

@@ -4,7 +4,6 @@ const fs = require('fs');
 const { Client } = require('ssh2');
 
 const MONITOR_INTERVAL_MS = 10000; // 监控刷新间隔
-const FAST_INTERVAL_MS = 2000;     // CPU高频采样（/proc/stat差值）
 const EXEC_TIMEOUT_MS = 8000;      // 单条监控命令超时
 const KEEPALIVE_MS = 15000;        // SSH心跳间隔
 const MAX_OUTPUT = 200 * 1024;     // 单命令输出上限200KB
@@ -15,8 +14,6 @@ let shellStream = null;
 let sftp = null;
 let monitorTimer = null;
 let monitorBusy = false;
-let fastTimer = null;
-let fastBusy = false;
 let lastLogin = null; // 保存最近一次登录参数供重连
 
 /* ---------- 配置存储（密码DPAPI加密） ---------- */
@@ -85,7 +82,7 @@ function createWindow() {
 /* ---------- SSH命令执行（带超时与输出上限） ---------- */
 
 function execCommand(cmd, timeoutMs = EXEC_TIMEOUT_MS) {
-  return new Promise((resolve, reject) => {
+  return acquireExecSlot().then(() => new Promise((resolve, reject) => {
     if (!conn) return reject(new Error('SSH未连接'));
     conn.exec(cmd, (err, stream) => {
       if (err) return reject(err);
@@ -111,30 +108,43 @@ function execCommand(cmd, timeoutMs = EXEC_TIMEOUT_MS) {
       stream.on('error', e => finish(reject, e));
       stream.on('close', code => finish(resolve, { out, errout, code }));
     });
-  });
+  })).finally(releaseExecSlot);
 }
+
+/* ---------- exec并发限制（≤2），防止同时打开过多channel导致SSH流损坏 ---------- */
+
+let execActive = 0;
+const execQueue = [];
+function pumpExecQueue() {
+  while (execActive < 2 && execQueue.length) { execActive++; execQueue.shift()(); }
+}
+function acquireExecSlot() {
+  return new Promise(r => { execQueue.push(r); pumpExecQueue(); });
+}
+function releaseExecSlot() { execActive--; pumpExecQueue(); }
 
 /* ---------- 监控采集（busy互斥，绝不堆积） ---------- */
 
 const CMDS = {
-  ips: "(ss -tnp state established 2>/dev/null || (netstat -antp 2>/dev/null | grep ESTABLISHED)) | head -n 40",
-  procs: "ps aux --sort=-%cpu | head -n 16",
-  mem: "free -b",
-  // 会话与任务：who判断谁在线；ps带etime判断任务运行时长
-  sessions: "who; echo SPLIT; ps -eo user:16,pid,pcpu,pmem,etime:12,args --sort=-pcpu | head -n 200"
+  // 四项合并为单条exec：减少channel数量与板上进程开销
+  all: "echo <<<IPS>>>; (ss -tnp state established 2>/dev/null || (netstat -antp 2>/dev/null | grep ESTABLISHED)) | head -n 40; " +
+       "echo <<<PROCS>>>; ps aux --sort=-%cpu | head -n 16; " +
+       "echo <<<MEM>>>; free -b; " +
+       "echo <<<SES>>>; who; " +
+       "echo <<<SESPS>>>; ps -eo user:16,pid,pcpu,pmem,etime:12,args --sort=-pcpu | head -n 200; " +
+       "echo <<<END>>>",
 };
 
 async function monitorTick() {
-  if (!conn || monitorBusy) return;
   monitorBusy = true;
   try {
-    const [ips, procs, mem, sessions] = await Promise.all([
-      execCommand(CMDS.ips),
-      execCommand(CMDS.procs),
-      execCommand(CMDS.mem),
-      execCommand(CMDS.sessions)
-    ]);
-    send('monitor:data', { ips: ips.out, procs: procs.out, mem: mem.out, sessions: sessions.out, ts: Date.now() });
+    const r = await execCommand(CMDS.all);
+    const sec = (n) => { const p = r.out.split(`<<<${n}>>>`); return p[1] || ''; };
+    send('monitor:data', {
+      ips: sec('IPS'), procs: sec('PROCS'), mem: sec('MEM'),
+      sessions: sec('SES') + 'SPLIT' + sec('SESPS'),
+      ts: Date.now()
+    });
   } catch (e) {
     // 单次采集失败静默跳过，连接级错误由 error/close 事件处理
   } finally {
@@ -142,32 +152,15 @@ async function monitorTick() {
   }
 }
 
-async function fastTick() {
-  if (!conn || fastBusy) return;
-  fastBusy = true;
-  try {
-    const r = await execCommand(CMDS.cpu, 5000);
-    send('monitor:fast', { cpu: r.out, ts: Date.now() });
-  } catch (e) {
-    // 静默跳过，主轮询兜底
-  } finally {
-    fastBusy = false;
-  }
-}
-
 function startMonitor() {
   stopMonitor();
-  fastTick();
-  fastTimer = setInterval(fastTick, FAST_INTERVAL_MS);
   monitorTick();
   monitorTimer = setInterval(monitorTick, MONITOR_INTERVAL_MS);
 }
 
 function stopMonitor() {
   if (monitorTimer) { clearInterval(monitorTimer); monitorTimer = null; }
-  if (fastTimer) { clearInterval(fastTimer); fastTimer = null; }
   monitorBusy = false;
-  fastBusy = false;
 }
 
 /* ---------- 连接生命周期 ---------- */
@@ -312,6 +305,39 @@ ipcMain.handle('sftp:upload', async (_e, remoteDir) => {
       else res({ ok: true, remote });
     });
   });
+});
+
+/* ---------- 文件管理：新建/删除 ---------- */
+
+ipcMain.handle('sftp:mkdir', async (_e, p) => {
+  if (!sftp) throw new Error('SFTP未就绪');
+  return new Promise((res, rej) => sftp.mkdir(p, e => e ? rej(e) : res(true)));
+});
+
+ipcMain.handle('sftp:touch', async (_e, p) => {
+  if (!sftp) throw new Error('SFTP未就绪');
+  // open(path,'w')：存在则截断，不存在则创建空文件
+  return new Promise((res, rej) => sftp.open(p, 'w', (e, h) => {
+    if (e) return rej(e);
+    sftp.close(h, () => res(true));
+  }));
+});
+
+async function sftpRmTree(p) {
+  const st = await new Promise((res, rej) => sftp.stat(p, (e, s) => e ? rej(e) : res(s)));
+  if (st.isDirectory()) {
+    const list = await new Promise((res, rej) => sftp.readdir(p, (e, l) => e ? rej(e) : res(l)));
+    for (const item of list) await sftpRmTree(p + '/' + item.filename);
+    await new Promise((res, rej) => sftp.rmdir(p, e => e ? rej(e) : res()));
+  } else {
+    await new Promise((res, rej) => sftp.unlink(p, e => e ? rej(e) : res()));
+  }
+}
+
+ipcMain.handle('sftp:delete', async (_e, p) => {
+  if (!sftp) throw new Error('SFTP未就绪');
+  if (!p || p === '/' || p === '.') throw new Error('拒绝删除根目录');
+  return sftpRmTree(p);
 });
 
 ipcMain.handle('config:list', async () => accountList(loadConfig()));

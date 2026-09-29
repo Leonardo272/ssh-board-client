@@ -1,5 +1,11 @@
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
+# 清理残留的调试端口占用（避免CDP连到僵尸实例）
+$conns = Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction SilentlyContinue
+if ($conns) {
+  $conns | Select-Object -ExpandProperty OwningProcess -Unique | ForEach-Object { Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue }
+  Start-Sleep -Seconds 2
+}
 $srv = Start-Process -FilePath python -ArgumentList (Join-Path $PSScriptRoot 'test-ssh-server.py') -PassThru -WindowStyle Hidden -RedirectStandardOutput (Join-Path $root 'test-server.log')
 $electron = Join-Path $root 'node_modules\electron\dist\electron.exe'
 $env:SBC_TEST_USER_DATA = Join-Path $env:TEMP ('sbc-test-userdata-' + (Get-Random))

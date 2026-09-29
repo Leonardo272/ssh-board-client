@@ -10,6 +10,8 @@ let term = null;
 let fit = null;
 let connected = false;
 let currentPath = '';
+let homePath = ''; // 登录家目录，用于计算相对路径
+let selName = '', selIsDir = false;
 let myClientIp = '';
 let lastOfflineReason = '';
 const decoder = new TextDecoder('utf-8');
@@ -212,11 +214,11 @@ api.on('ssh:client-info', (info) => { myClientIp = (info || '').split(/\s+/)[0] 
 api.on('sftp:ready', async () => {
   try {
     currentPath = await api.sftpPwd();
+    homePath = currentPath;
     await loadDir(currentPath);
   } catch (e) { toast('SFTP初始化失败: ' + e.message, true); }
 });
 api.on('monitor:data', renderMonitor);
-api.on('monitor:fast', (d) => renderCpu(d.cpu)); // CPU利用率2s刷新
 
 /* ---------- 文件面板 ---------- */
 
@@ -247,6 +249,71 @@ async function loadDir(p) {
   }
 }
 
+/* ---------- 文件管理操作 ---------- */
+
+function askName(placeholder, cb) {
+  const row = $('nameRow'), input = $('nameInput');
+  row.classList.remove('hidden');
+  input.value = '';
+  input.placeholder = placeholder;
+  input.focus();
+  const done = (ok) => {
+    row.classList.add('hidden');
+    $('nameOk').onclick = $('nameCancel').onclick = input.onkeydown = null;
+    if (ok && input.value.trim()) cb(input.value.trim());
+  };
+  $('nameOk').onclick = () => done(true);
+  $('nameCancel').onclick = () => done(false);
+  input.onkeydown = (e) => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
+}
+
+function selectedAbs() {
+  return selName ? posixJoin(currentPath, selName) : currentPath;
+}
+
+function toRel(abs) {
+  if (homePath && abs === homePath) return '.';
+  if (homePath && abs.startsWith(homePath + '/')) return abs.slice(homePath.length + 1);
+  return abs; // 家目录之外无法取相对，退回绝对
+}
+
+$('btnMkdir').addEventListener('click', () => {
+  if (!currentPath) return toast('SFTP未就绪', true);
+  askName('新文件夹名称', async (name) => {
+    try { await api.sftpMkdir(posixJoin(currentPath, name)); toast('已创建文件夹 ' + name); await loadDir(currentPath); }
+    catch (e) { toast('创建失败: ' + e.message, true); }
+  });
+});
+
+$('btnTouch').addEventListener('click', () => {
+  if (!currentPath) return toast('SFTP未就绪', true);
+  askName('新文件名称', async (name) => {
+    try { await api.sftpTouch(posixJoin(currentPath, name)); toast('已创建文件 ' + name); await loadDir(currentPath); }
+    catch (e) { toast('创建失败: ' + e.message, true); }
+  });
+});
+
+$('btnDelete').addEventListener('click', async () => {
+  if (!currentPath) return toast('SFTP未就绪', true);
+  if (!selName) return toast('请先单击选中要删除的文件或文件夹', true);
+  const abs = selectedAbs();
+  if (!window.confirm(`确认删除 ${abs} ？${selIsDir ? '文件夹及其全部内容将被递归删除！' : ''}`)) return;
+  try { await api.sftpDelete(abs); toast('已删除 ' + selName); selName = ''; await loadDir(currentPath); }
+  catch (e) { toast('删除失败: ' + e.message, true); }
+});
+
+$('btnCopyAbs').addEventListener('click', async () => {
+  if (!currentPath) return toast('SFTP未就绪', true);
+  const p = selectedAbs();
+  try { await api.clipWrite(p); toast('已复制绝对路径: ' + p); } catch (e) { toast('复制失败', true); }
+});
+
+$('btnCopyRel').addEventListener('click', async () => {
+  if (!currentPath) return toast('SFTP未就绪', true);
+  const p = toRel(selectedAbs());
+  try { await api.clipWrite(p); toast('已复制相对路径: ' + p); } catch (e) { toast('复制失败', true); }
+});
+
 $('fileList').addEventListener('dblclick', async (e) => {
   const row = e.target.closest('.frow');
   if (!row || row.classList.contains('head')) return;
@@ -258,6 +325,16 @@ $('fileList').addEventListener('dblclick', async (e) => {
     if (r.ok) toast('已下载: ' + r.local);
     else if (!r.canceled) toast('下载失败: ' + (r.error || '未知错误'), true);
   }
+});
+
+// 单击选中（供删除/复制路径），双击仍为进入/下载
+$('fileList').addEventListener('click', (e) => {
+  const row = e.target.closest('.frow');
+  document.querySelectorAll('#fileList .frow.selected').forEach(r => r.classList.remove('selected'));
+  if (!row || row.classList.contains('head')) { selName = ''; selIsDir = false; return; }
+  row.classList.add('selected');
+  selName = row.dataset.name;
+  selIsDir = row.dataset.dir === '1';
 });
 
 $('btnUp').addEventListener('click', () => { const p = posixParent(currentPath); if (p) loadDir(p); });
