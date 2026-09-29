@@ -127,19 +127,20 @@ function releaseExecSlot() { execActive--; pumpExecQueue(); }
 
 const CMDS = {
   // 四项合并为单条exec：减少channel数量与板上进程开销
-  all: "echo <<<IPS>>>; (ss -tnp state established 2>/dev/null || (netstat -antp 2>/dev/null | grep ESTABLISHED)) | head -n 40; " +
-       "echo <<<PROCS>>>; ps aux --sort=-%cpu | head -n 16; " +
-       "echo <<<MEM>>>; free -b; " +
-       "echo <<<SES>>>; who; " +
-       "echo <<<SESPS>>>; ps -eo user:16,pid,pcpu,pmem,etime:12,args --sort=-pcpu | head -n 200; " +
-       "echo <<<END>>>",
+  // 分段标记用@@@，避免bash的<<<here-string语法冲突
+  all: "echo @@@IPS@@@; (ss -tnp state established 2>/dev/null || (netstat -antp 2>/dev/null | grep ESTABLISHED)) | head -n 40; " +
+       "echo @@@PROCS@@@; ps aux --sort=-%cpu | head -n 16; " +
+       "echo @@@MEM@@@; free -b; " +
+       "echo @@@SES@@@; who; " +
+       "echo @@@SESPS@@@; ps -eo user:16,pid,pcpu,pmem,etime:12,args --sort=-pcpu | head -n 200; " +
+       "echo @@@END@@@",
 };
 
 async function monitorTick() {
   monitorBusy = true;
   try {
     const r = await execCommand(CMDS.all);
-    const sec = (n) => { const p = r.out.split(`<<<${n}>>>`); return p[1] || ''; };
+    const sec = (n) => { const p = r.out.split(`@@@${n}@@@`); return p[1] || ''; };
     send('monitor:data', {
       ips: sec('IPS'), procs: sec('PROCS'), mem: sec('MEM'),
       sessions: sec('SES') + 'SPLIT' + sec('SESPS'),

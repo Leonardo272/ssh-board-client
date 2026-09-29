@@ -165,25 +165,25 @@ class Server(paramiko.ServerInterface):
                 chan.send_exit_status(0)
                 chan.close()
                 return
-            if cmd.startswith('echo <<<IPS>>>'):
+            if cmd.startswith('echo @@@IPS@@@'):
                 # 合并监控命令mock：按分段标记返回
                 mock = (
-                    '<<<IPS>>>\n'
+                    '@@@IPS@@@\n'
                     'Estab 0 0 192.168.1.50:9981 192.168.1.88:40001 users:(("icraft-serve",pid=888,fd=8))\n'
                     'Estab 0 0 192.168.1.50:22 192.168.1.99:55555 users:(("sshd",pid=4617,fd=3))\n'
                     'Estab 0 0 192.168.1.50:22 192.168.1.77:41234 users:(("sshd",pid=999,fd=3))\n'
-                    '<<<PROCS>>>\n'
+                    '@@@PROCS@@@\n'
                     'USER       PID %CPU %MEM COMMAND\n'
                     'fmsh      4960 200.0  1.2 python3 /home/fmsh/test_infer.py\n'
                     'root     13796 200.0  0.0 [ss] <defunct>\n'
-                    '<<<MEM>>>\n'
+                    '@@@MEM@@@\n'
                     '              total        used        free      shared  buff/cache   available\n'
                     'Mem:    8589934592 2147483648 1073741824   134217728  4294967296  5368709120\n'
                     'Swap:   2147483648           0 2147483648\n'
-                    '<<<SES>>>\n'
+                    '@@@SES@@@\n'
                     'fmsh    pts/1        2026-09-27 09:00 (192.168.1.10)\n'
                     'myuser  pts/2        2026-09-27 09:05 (192.168.1.99)\n'
-                    '<<<SESPS>>>\n'
+                    '@@@SESPS@@@\n'
                     'USER             PID  %CPU %MEM ELAPSED     ARGS\n'
                     'fmsh            4960 200.0  1.2 05:32       python3 /home/fmsh/test_infer.py\n'
                     'myuser          5100   2.0  0.5 00:10       -bash\n'
@@ -196,7 +196,7 @@ class Server(paramiko.ServerInterface):
                     'fmsh            4961 100.0  0.0 00:00       ps aux --sort=-%cpu\n'
                     'root          13786  50.0  0.0 00:00       bash -c grep ^cpu /proc/stat; echo SPLIT\n'
                     'root          13789  50.0  0.0 00:00       bash -c busybox devmem 0xE6002024 32\n'
-                    '<<<END>>>\n'
+                    '@@@END@@@\n'
                 )
                 chan.send(mock.encode('utf-8'))
                 chan.send_exit_status(0)
@@ -240,3 +240,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
