@@ -360,6 +360,9 @@ function parseIpLines(text) {
     if (pairs.length < 2) continue;
     const local = pairs[pairs.length - 2];
     const peer = pairs[pairs.length - 1];
+    // 防御：必须是真实IP（IPv4含点 / IPv6含括号），过滤ps输出里的mm:ss等伪格式
+    const isAddr = (x) => x.includes('.') || x.includes('[');
+    if (!isAddr(local) || !isAddr(peer)) continue;
     let proc = '';
     const m = s.match(/users:\(\("([^",]+)",pid=(\d+)/);
     if (m) proc = `${m[1]}(${m[2]})`;

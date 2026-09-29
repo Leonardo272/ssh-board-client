@@ -140,7 +140,12 @@ async function monitorTick() {
   monitorBusy = true;
   try {
     const r = await execCommand(CMDS.all);
-    const sec = (n) => { const p = r.out.split(`@@@${n}@@@`); return p[1] || ''; };
+    // 按标记截取本段：切到下一个@@@为止，防止混入后续段落
+    const sec = (n) => {
+      const p = r.out.split(`@@@${n}@@@`);
+      if (p.length < 2) return '';
+      return p[1].split('@@@')[0];
+    };
     send('monitor:data', {
       ips: sec('IPS'), procs: sec('PROCS'), mem: sec('MEM'),
       sessions: sec('SES') + 'SPLIT' + sec('SESPS'),
