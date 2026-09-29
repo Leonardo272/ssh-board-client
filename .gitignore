@@ -11,3 +11,4 @@ dist-new/
 scripts/sftp-root/
 
 dist-new/
+__pycache__/
