@@ -353,6 +353,47 @@ ipcMain.handle('config:list', async () => accountList(loadConfig()));
 ipcMain.handle('clip:read', () => require('electron').clipboard.readText());
 ipcMain.on('clip:write', (_e, text) => { try { require('electron').clipboard.writeText(String(text || '')); } catch (e) {} });
 
+/* ---------- 网段探测：并发检测同网段主机22端口 ---------- */
+
+ipcMain.handle('net:scan', async (_e, prefix) => {
+  const net = require('net');
+  const results = [];
+  const tasks = [];
+  for (let i = 1; i <= 254; i++) {
+    const ip = `${prefix}.${i}`;
+    tasks.push(new Promise(res => {
+      const s = new net.Socket();
+      s.setTimeout(900);
+      s.once('connect', () => { results.push(ip); s.destroy(); });
+      s.once('timeout', () => { try { s.destroy(); } catch (e) {} });
+      s.once('error', () => { try { s.destroy(); } catch (e) {} });
+      s.once('close', () => res());
+      try { s.connect(22, ip); } catch (e) { res(); }
+    }));
+  }
+  await Promise.all(tasks);
+  return results.sort((a, b) => parseInt(a.split('.')[3], 10) - parseInt(b.split('.')[3], 10));
+});
+
+/* ---------- 板上留言板（/tmp共享文件，所有登录用户互通） ---------- */
+
+ipcMain.handle('chat:read', async () => {
+  const r = await execCommand('tail -n 50 /tmp/board-chat.log 2>/dev/null; true');
+  return r.out || '';
+});
+
+ipcMain.handle('chat:send', async (_e, msg) => {
+  const safe = String(msg || '').replace(/[\r\n"`$\\]/g, ' ').slice(0, 300);
+  if (!safe) return { ok: false };
+  const user = lastLogin ? lastLogin.username : 'user';
+  const host = lastLogin ? lastLogin.host : '';
+  const tail = host.split('.').pop();
+  const cmd = `touch /tmp/board-chat.log; chmod 666 /tmp/board-chat.log 2>/dev/null; ` +
+    `printf '[%s] %s@%s: %s\\n' "$(date '+%m-%d %H:%M')" '${user.replace(/'/g, '')}' '${tail}' '${safe}' >> /tmp/board-chat.log`;
+  await execCommand(cmd);
+  return { ok: true };
+});
+
 ipcMain.handle('config:fill', async (_e, id) => {
   const a = (loadConfig().accounts || []).find(x => x.id === id);
   if (!a) return null;

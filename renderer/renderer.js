@@ -202,6 +202,64 @@ $('btnReconnect').addEventListener('click', () => {
   $('connectOverlay').classList.remove('hidden');
 });
 
+/* ---------- 同网段探测 ---------- */
+
+let scanBusy = false;
+$('btnScan').addEventListener('click', async () => {
+  if (scanBusy) return;
+  const host = $('host').value.trim() || (lastHost || '');
+  if (!host) return toast('请先登录板子（按其网段探测）', true);
+  const prefix = host.split('.').slice(0, 3).join('.');
+  if (prefix.split('.').length !== 3) return toast('IP格式不支持', true);
+  scanBusy = true;
+  toast(`正在探测 ${prefix}.1-254 的SSH主机…`);
+  try {
+    const alive = await api.netScan(prefix);
+    const el = document.createElement('div');
+    el.className = 'scanrow';
+    el.textContent = `🔍 ${prefix}.x 存活SSH主机 ${alive.length} 台：${alive.join('、') || '无'}`;
+    const ipList = $('ipList');
+    ipList.prepend(el);
+  } catch (e) { toast('探测失败: ' + e.message, true); }
+  finally { scanBusy = false; }
+});
+
+/* ---------- 留言板 ---------- */
+
+let chatTimer = null;
+function openChat() {
+  if (!connected) return toast('连接后可用', true);
+  $('chatOverlay').classList.remove('hidden');
+  loadChat();
+  chatTimer = setInterval(loadChat, 2000);
+  $('chatInput').focus();
+}
+function closeChat() {
+  $('chatOverlay').classList.add('hidden');
+  if (chatTimer) { clearInterval(chatTimer); chatTimer = null; }
+}
+async function loadChat() {
+  try {
+    const text = await api.chatRead();
+    const myUser = $('username').value.trim();
+    $('chatList').innerHTML = text.split('\n').filter(Boolean).map(l =>
+      `<div class="chatline${l.includes(myUser + '@') ? ' me' : ''}">${esc(l)}</div>`
+    ).join('');
+    $('chatList').scrollTop = $('chatList').scrollHeight;
+  } catch (e) {}
+}
+async function sendChat() {
+  const v = $('chatInput').value.trim();
+  if (!v) return;
+  $('chatInput').value = '';
+  await api.chatSend(v);
+  await loadChat();
+}
+$('btnChat').addEventListener('click', openChat);
+$('btnChatClose').addEventListener('click', closeChat);
+$('btnChatSend').addEventListener('click', sendChat);
+$('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
+
 /* ---------- 主进程事件 ---------- */
 
 api.on('shell:data', (chunk) => {

@@ -24,6 +24,9 @@ contextBridge.exposeInMainWorld('bridge', {
   configDelete: (id) => ipcRenderer.invoke('config:delete', id),
   clipRead: () => ipcRenderer.invoke('clip:read'),
   clipWrite: (t) => ipcRenderer.send('clip:write', t),
+  netScan: (prefix) => ipcRenderer.invoke('net:scan', prefix),
+  chatRead: () => ipcRenderer.invoke('chat:read'),
+  chatSend: (msg) => ipcRenderer.invoke('chat:send', msg),
   on: (ch, cb) => {
     if (ALLOWED_EVENTS.includes(ch)) {
       ipcRenderer.on(ch, (_e, data) => cb(data));

@@ -11,6 +11,7 @@
   <header id="topbar">
     <div id="brand">开发板SSH监控客户端</div>
     <div id="connInfo"></div>
+    <button id="btnChat" class="ghost small" type="button">💬 留言板</button>
     <button id="btnDisconnect" class="ghost" type="button">断开</button>
   </header>
 
@@ -48,7 +49,7 @@
 
     <aside id="rightPanel">
       <section class="panel" id="ipPanel">
-        <div class="panel-head">已连接IP <span id="ipTime" class="tag"></span></div>
+        <div class="panel-head">已连接IP <span id="ipTime" class="tag"></span><button id="btnScan" class="small ghost" type="button" title="探测同网段主机">🔍同网段</button></div>
         <div id="ipList" class="scroll"><div class="empty">等待数据…</div></div>
       </section>
       <section class="panel" id="procPanel">
@@ -91,6 +92,16 @@
       <h2>连接已断开</h2>
       <p id="offlineReason"></p>
       <button id="btnReconnect" type="button">重新连接</button>
+    </div>
+  </div>
+  <div id="chatOverlay" class="overlay hidden">
+    <div id="chatBox">
+      <div class="chat-head">板子留言板（同一块板的所有登录用户互通）<button id="btnChatClose" type="button" class="small ghost">✕</button></div>
+      <div id="chatList" class="scroll"></div>
+      <div class="chat-input">
+        <input id="chatInput" placeholder="输入消息，回车发送" maxlength="300">
+        <button id="btnChatSend" type="button">发送</button>
+      </div>
     </div>
   </div>
 
